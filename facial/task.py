@@ -11,13 +11,15 @@ class FaceLandmarkTask(pl.LightningModule):
     def __init__(self, pretrained=True, in_chan=1, num_pts=136, lr=0.001, **kwargs):
         super().__init__()
         
-        self.model = FaceLandmarkNet(in_chan=in_chan, num_pts=num_pts)
+        self.model: FaceLandmarkNet = FaceLandmarkNet(in_chan=in_chan, num_pts=num_pts)
         
-        self.trn_acc: torchmetrics.Accuracy = torchmetrics.Accuracy()
-        self.trn_loss: torchmetrics.AverageMeter  = torchmetrics.MeanMetric()
-        self.val_acc: torchmetrics.Accuracy = torchmetrics.Accuracy()
-        self.val_loss: torchmetrics.AverageMeter  = torchmetrics.MeanMetric()
+        self.trn_loss: torchmetrics.MeanSquaredError = torchmetrics.MeanSquaredError()
+        self.val_loss: torchmetrics.MeanSquaredError = torchmetrics.MeanSquaredError()
         
+        self.trn_avg: torchmetrics.AverageMeter  = torchmetrics.MeanMetric()
+        self.val_avg: torchmetrics.AverageMeter  = torchmetrics.MeanMetric()
+        
+        self.learning_rate = lr
         self.criterion = nn.MSELoss()
         self.save_hyperparameters()
         self.save_hyperparameters(kwargs)
@@ -33,7 +35,8 @@ class FaceLandmarkTask(pl.LightningModule):
         loss.backward()
         
     def shared_step(self, batch, batch_idx):
-        images, key_pts = batch
+        images = batch['image']
+        key_pts = batch['keypoints']
         
         # flatten pts
         key_pts = key_pts.view(key_pts.size(0), -1)
@@ -48,32 +51,32 @@ class FaceLandmarkTask(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch, batch_idx)
-        trn_acc = self.trn_acc(preds, labels)
-        trn_loss = self.trn_loss(loss)
+        trn_avg = self.trn_avg(preds, labels)
+        trn_loss = self.trn_loss(preds, labels)
         
-        self.log('trn_step_loss', trn_loss, prog_bar=True, logger=True)
-        self.log('trn_step_acc', trn_acc,  prog_bar=True, logger=True)
+        self.log('trn_step_loss', trn_loss, prog_bar=True, logger=True,  on_epoch=True)
+        self.log('trn_step_avg', trn_avg,  prog_bar=True, logger=True,  on_epoch=True)
         
         return loss
         
     def training_epoch_end(self, outs):
-        self.log('trn_epoch_acc', self.trn_acc.compute(), logger=True)
         self.log('trn_epoch_loss', self.trn_loss.compute(), logger=True)
+        self.log('trn_epoch_avg', self.trn_avg.compute(), logger=True)
         
-    
+        
     def validation_step(self, batch, batch_idx):
         loss, preds, labels = self.shared_step(batch, batch_idx)
-        val_acc = self.val_acc(preds, labels)
-        val_loss = self.val_loss(loss)
+        val_loss = self.val_loss(preds, labels)
+        val_avg = self.val_avg(preds, labels)
         
-        self.log('val_step_loss', val_loss, prog_bar=True, logger=True)
-        self.log('val_step_acc', val_acc,  prog_bar=True, logger=True)
+        self.log('val_step_loss', val_loss, prog_bar=True, logger=True,  on_epoch=True)
+        self.log('val_step_avg', val_avg,  prog_bar=True, logger=True,  on_epoch=True)
         
         return loss
     
     def validation_epoch_end(self, outs):
-        self.log('val_epoch_acc', self.val_acc.compute(), logger=True)
         self.log('val_epoch_loss', self.val_loss.compute(), logger=True)
+        self.log('val_epoch_avg', self.val_avg.compute(), logger=True)
     
     
     
