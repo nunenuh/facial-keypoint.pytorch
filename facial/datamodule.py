@@ -8,8 +8,8 @@ from torchvision import transforms
 from typing import *
 import torch
 
-from . import transform as CT
-from .datasets import FacialKeypointsDataset
+from . import transforms as CT
+from .dataset import FacialKeypointsDataset
 
 
 def transform_fn(size=224):
@@ -44,14 +44,14 @@ class FacialKeypointsDataModule(pl.LightningDataModule):
 
         self.trainset = FacialKeypointsDataset(csv_file=self.train_csvpath, 
                                                root_dir=self.train_path, 
-                                               transforms=self.train_transform)
+                                               transform=self.train_transform)
         
         self.validset = FacialKeypointsDataset(csv_file=self.valid_csvpath, 
                                                root_dir=self.valid_path,
-                                               transforms=self.valid_transform)
+                                               transform=self.valid_transform)
 
     def train_dataloader(self):
-        return DataLoader(self.trainset, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.trainset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True, )
 
     def val_dataloader(self):
-        return DataLoader(self.validset, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.validset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True, )
